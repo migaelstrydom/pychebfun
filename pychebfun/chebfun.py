@@ -28,7 +28,7 @@ def cast_scalar(method):
     @wraps(method)
     def new_method(self, other):
         if np.isscalar(other):
-            other = Chebfun([other])
+            other = Chebfun([float(other)])
         return method(self, other)
     return new_method
 
@@ -41,6 +41,7 @@ class Chebfun(object):
     """
     max_nb_dichotomy = 12 # maximum number of dichotomy of the interval
 
+
     class NoConvergence(Exception):
         """
         Raised when dichotomy does not converge.
@@ -48,13 +49,14 @@ class Chebfun(object):
 
     def __init__(self, f=None, N=0, chebcoeff=None,):
         """
-Create a Chebyshev polynomial approximation of the function $f$ on the interval :math:`[-1, 1]`.
+        Create a Chebyshev polynomial approximation of the function $f$ on
+        the interval :math:`[-1, 1]`.
 
-:param callable f: Python, Numpy, or Sage function
-:param int N: (default = None)  specify number of interpolating points
-:param np.array chebcoeff: (default = np.array(0)) specify the coefficients of a Chebfun
+        :param callable f: Python, Numpy, or Sage function
+        :param int N: (default = None)  specify number of interpolating points
+        :param np.array chebcoeff: (default = np.array(0)) specify the
+               coefficients of a Chebfun
         """
-
         if self.record:
             self.intermediate = []
             self.bnds = []
@@ -68,68 +70,56 @@ Create a Chebyshev polynomial approximation of the function $f$ on the interval 
             pass
         else:
             vals = np.array(f)
-            N = len(vals)-1
-            if N:
-                self.ai = self.chebpolyfit(vals, N, sample=False)
-                self.x = self.interpolation_points(N)
-            else: # just one value provided
-                self.ai = vals.copy()
-                self.x = [1.]
+
+            N = len(vals)
+
+            self.ai = self.cheb_poly_fit_array(vals)
             self.f = vals.copy()
-            self.p  = Bary(self.x, self.f)
+
+            if N == 1:
+                self.x = self.interpolation_points(1)
+                self.p  = Bary(self.x, np.array([self.f[0], self.f[0]]))
+            else:
+                self.x = self.interpolation_points(N-1)
+                self.p  = Bary(self.x, self.f)
+
             return None
 
         if isinstance(f, Chebfun): # copy if f is another Chebfun
             self.ai = f.ai.copy()
             self.x = f.x
             self.f = f.f
+            self.p = f.p
 
         if chebcoeff is not None: # if the coefficients of a Chebfun are given
 
-            self.N = N = len(chebcoeff)
+            self.N = N = len(chebcoeff) - 1
             self.ai = chebcoeff
-            self.f = idct(chebcoeff)
-            self.x = self.interpolation_points(N-1)
+            if N == 0:
+                self.x = self.interpolation_points(1)
+                self.f = np.array([chebcoeff[0], chebcoeff[0]])
+            else:
+                self.f = idct(chebcoeff)
+                self.x = self.interpolation_points(N)
             self.p = Bary(self.x, self.f)
 
         else: # if the coefficients of a Chebfun are not given
             if not N: # N is not provided
                 # Find out the right number of coefficients to keep
-                for k in xrange(2, self.max_nb_dichotomy):
-                    N = pow(2, k)
+                coeffs = self.get_optimal_coefficients(f, pow(2, self.max_nb_dichotomy))
+                N = len(coeffs)-1
 
-                    coeffs = self.chebpolyfit(f, N, sample=True)
-
-                    # 3) Check for negligible coefficients
-                    #    If within bound: get negligible coeffs and bread
-                    bnd = 128*emach*abs(np.max(coeffs))
-                    if self.record:
-                        self.bnds.append(bnd)
-                        self.intermediate.append(coeffs)
-
-                    last = abs(coeffs[-2:])
-                    if np.all(last <= bnd):
-                        break
-                else:
-                    raise self.NoConvergence(last, bnd)
-
-
-                # End of convergence loop: construct polynomial
-                [inds]  = np.where(abs(coeffs) >= bnd)
-                N = inds[-1]
-
-                if self.record:
-                    self.bnds.append(bnd)
-                    self.intermediate.append(coeffs)
             else:
                 nextpow2 = int(np.log2(N))+1
-                coeffs = self.chebpolyfit(f, pow(2, nextpow2), sample=True)
+                coeffs = self.cheb_poly_fit_function(f, pow(2, nextpow2))
 
             self.ai = coeffs[:N+1]
-            self.x  = self.interpolation_points(N)
+            if N == 0:
+                self.x = self.interpolation_points(1)
+            else:
+                self.x  = self.interpolation_points(N)
             self.f  = f(self.x)
             self.p  = Bary(self.x, self.f)
-            
 
 
     record = False # whether to record convergence information
@@ -141,19 +131,62 @@ Create a Chebyshev polynomial approximation of the function $f$ on the interval 
         """
         return np.cos(np.arange(N+1)*np.pi/N)
 
+    def get_optimal_coefficients(self, f, maxN):
+        N = 2
+        for k in xrange(2, self.max_nb_dichotomy):
+            N = N*2
+
+            coeffs = self.cheb_poly_fit_function(f, N)
+            absMaxCoeff = np.max(np.abs(coeffs))
+            # Special case: check for the zero function
+            if absMaxCoeff < 2*emach:
+                return np.array([0.])
+            # 3) Check for negligible coefficients
+            #    If within bound: get negligible coeffs and break
+            bnd = 128*emach*absMaxCoeff
+            if self.record:
+                self.bnds.append(bnd)
+                self.intermediate.append(coeffs)
+
+            last = abs(coeffs[-2:])
+            if np.all(last <= bnd) or N >= maxN:
+                break
+
+        # End of convergence loop: construct polynomial
+        [inds]  = np.where(abs(coeffs) >= bnd)
+        N = min(inds[-1], maxN)
+
+        if self.record:
+            self.bnds.append(bnd)
+            self.intermediate.append(coeffs)
+
+        if N == pow(2, self.max_nb_dichotomy-1):
+            raise self.NoConvergence(last, bnd)
+
+        return coeffs[:N+1]
+
     def sample(self, f, N):
         x = self.interpolation_points(N)
         return f(x)
 
-    def chebpolyfit(self, f, N, sample=True):
+    def cheb_poly_fit_function(self, f, N):
         """
         Compute Chebyshev coefficients of a function f on N points.
+        @return: The the first N Chebyshev coefficients in the expansion of f
         """
-        if sample:
-            sampled = self.sample(f, N)
-        else: # f is a vector
-            sampled = f
-        evened = even_data(sampled)
+        evened = even_data(self.sample(f,N))
+        coeffs = dct(evened)
+        return coeffs
+
+    def cheb_poly_fit_array(self, f):
+        """
+        Compute Chebyshev coefficients of a function defined on an array f.
+        @return: The the first N Chebyshev coefficients in the expansion of f, where
+        N = len(f)
+        """
+        if len(f) == 1:
+            return np.array(f)
+        evened = even_data(f)
         coeffs = dct(evened)
         return coeffs
 
@@ -186,7 +219,10 @@ Create a Chebyshev polynomial approximation of the function $f$ on the interval 
         """
         Addition
         """
-        return Chebfun(lambda x: self(x) + other(x),)
+        #return Chebfun(lambda x: self(x) + other(x),)
+        return Chebfun(None, 0,
+                       self.get_optimal_coefficients(lambda x: self(x) + other(x),
+                                                   max(len(self), len(other))))
 
     __radd__ = __add__
 
@@ -196,7 +232,10 @@ Create a Chebyshev polynomial approximation of the function $f$ on the interval 
         """
         Chebfun subtraction.
         """
-        return Chebfun(lambda x: self(x) - other(x),)
+        #return Chebfun(lambda x: self(x) - other(x),)
+        return Chebfun(None, 0,
+                       self.get_optimal_coefficients(lambda x: self(x) - other(x),
+                                                   max(len(self), len(other))))
 
     def __rsub__(self, other):
         return -(self - other)
@@ -207,6 +246,7 @@ Create a Chebyshev polynomial approximation of the function $f$ on the interval 
         """
         Chebfun multiplication.
         """
+        #print('multiplied', self, other)
         return Chebfun(lambda x: self(x) * other(x),)
 
     __rmul__ = __mul__
@@ -291,7 +331,7 @@ Create a Chebyshev polynomial approximation of the function $f$ on the interval 
         """
         return Chebfun(self.p.integrate)
 
- 
+
     def derivative(self):
         return self.differentiate()
 
@@ -356,7 +396,7 @@ Create a Chebyshev polynomial approximation of the function $f$ on the interval 
     def compare(self, f, *args, **kwds):
         """
         Plots the original function against its chebfun interpolant.
-        
+
         INPUTS:
 
             -- f: Python, Numpy, or Sage function
@@ -364,7 +404,7 @@ Create a Chebyshev polynomial approximation of the function $f$ on the interval 
         x   = np.linspace(-1, 1, 10000)
         fig = plt.figure()
         ax  = fig.add_subplot(211)
-        
+
         ax.plot(x, f(x), '#dddddd', linewidth=10, label='Actual', *args, **kwds)
         label = 'Chebfun Interpolant (d={0})'.format(len(self))
         self.plot(color='red', label=label, *args, **kwds)
@@ -380,7 +420,10 @@ def chebpoly(n):
         return Chebfun(np.array([1.]))
     vals = np.ones(n+1)
     vals[-1::-2] = -1
-    return Chebfun(vals)
+    if len(vals) % 2 == 1:
+        return Chebfun(-vals)
+    else:
+        return Chebfun(vals)
 
 def even_data(data):
     """

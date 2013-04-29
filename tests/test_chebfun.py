@@ -43,6 +43,9 @@ def runge(x):
 @np.vectorize
 def zero(x):
     return 0.
+@np.vectorize
+def constFunc(val, x):
+    return val
 
 xs = np.linspace(-1,1,1000)
 
@@ -91,6 +94,14 @@ class Test_Chebfun(unittest.TestCase):
     def test_chebcoeffplot(self):
         self.p.chebcoeffplot()
 
+    def test_constant(self):
+        self.assertEqual(Chebfun(1.), Chebfun([1.]))
+        self.assertEqual(Chebfun(1.), Chebfun([1., 1.]))
+        self.assertEqual(Chebfun(1.), Chebfun([1., 1., 1.]))
+        self.assertEqual(Chebfun(1.), Chebfun([1., 1., 1., 1.]))
+        self.assertEqual(Chebfun(1.), Chebfun([1., 1., 1., 1., 1.]))
+        self.assertEqual(Chebfun(1.), Chebfun([1.]*137))
+
     def test_prod(self):
         pp = self.p*self.p
         npt.assert_array_almost_equal(self.p(xs)*self.p(xs),pp(xs))
@@ -121,8 +132,7 @@ class Test_Chebfun(unittest.TestCase):
 
     def test_zero(self):
         p = Chebfun(zero)
-        self.assertEqual(len(p),5) # should be equal to the minimum length, 4+1
-
+        self.assertEqual(len(p),2)
 
     def test_nonzero(self):
         self.assertTrue(self.p)
@@ -187,7 +197,10 @@ class Test_Misc(unittest.TestCase):
             except Exception as e:
                 raise Exception('Error in {0}: {0}'.format(example), e)
 
-    def test_chebpoly(self, ns=[0,5]):
+    def test_chebpoly(self, ns=[1,2,3,4,5,6,7,8,9,10]):
+        """
+        Check that chebpoly really returns the chebyshev polynomials.
+        """
         for n in ns:
             c = chebpoly(n)
             npt.assert_array_almost_equal(c.chebyshev_coefficients(), [0]*n+[1.])
@@ -238,11 +251,26 @@ class Test_Arithmetic(unittest.TestCase):
         self.p1 = Chebfun(f)
         self.p2 = Chebfun(runge)
 
+    def test_constant_functions(self):
+        self.assertEqual(0, Chebfun(zero))
+        cf = Chebfun(2.)
+        self.assertEqual(3*cf, 6)
+        self.assertEqual(3.14159*cf, 6.28318)
+        self.assertEqual(len(cf), 2)
+        self.assertEqual(len(Chebfun(lambda x: constFunc(1.,x))), 2)
+        self.assertEqual(len(Chebfun(lambda x: constFunc(-2.71828,x))), 2)
+        self.assertEqual(len(Chebfun(lambda x: constFunc(0.,x))), 2)
+        self.assertEqual(len(Chebfun(Chebfun(zero))), 2)
+
+    def test_mul(self):
+        self.assertEqual(self.p1*Chebfun(zero), Chebfun(zero))
+        self.assertEqual(self.p1*Chebfun(lambda x: constFunc(1., x)), self.p1)
+
     def test_scalar_mul(self):
         self.assertEqual(self.p1, self.p1)
         self.assertEqual(self.p1*1, 1*self.p1)
         self.assertEqual(self.p1*1, self.p1)
-        self.assertEqual(0*self.p1, zero)
+        self.assertEqual(0*self.p1, Chebfun(zero))
 
     def test_commutativity(self):
         self.assertEqual(self.p1*self.p2, self.p2*self.p1)
@@ -265,4 +293,4 @@ if __name__ == '__main__':
     unittest.main()
     ## suite = unittest.TestLoader().loadTestsFromTestCase(Test_Chebfun)
     ## unittest.TextTestRunner(verbosity=2).run(suite)
-    
+
