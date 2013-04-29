@@ -74,14 +74,15 @@ class Chebfun(object):
             N = len(vals)
 
             self.ai = self.cheb_poly_fit_array(vals)
-            self.f = vals.copy()
 
             if N == 1:
+                self.f = np.array([vals[0], vals[0]])
                 self.x = self.interpolation_points(1)
-                self.p  = Bary(self.x, np.array([self.f[0], self.f[0]]))
             else:
+                self.f = vals.copy()
                 self.x = self.interpolation_points(N-1)
-                self.p  = Bary(self.x, self.f)
+
+            self.p  = Bary(self.x, self.f)
 
             return None
 
@@ -94,12 +95,12 @@ class Chebfun(object):
         if chebcoeff is not None: # if the coefficients of a Chebfun are given
 
             self.N = N = len(chebcoeff) - 1
-            self.ai = chebcoeff
+            self.ai = np.array(chebcoeff)
             if N == 0:
                 self.x = self.interpolation_points(1)
-                self.f = np.array([chebcoeff[0], chebcoeff[0]])
+                self.f = np.array([self.ai[0], self.ai[0]])
             else:
-                self.f = idct(chebcoeff)
+                self.f = idct(self.ai)
                 self.x = self.interpolation_points(N)
             self.p = Bary(self.x, self.f)
 

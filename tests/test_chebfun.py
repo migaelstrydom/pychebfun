@@ -55,6 +55,33 @@ class Test_Chebfun(unittest.TestCase):
         Chebfun.record = True
         self.p = Chebfun(f,)
 
+    def test_initialise(self):
+        # Init with array
+        self.assertEqual(len(Chebfun(1.).x), 2)
+        self.assertEqual(len(Chebfun(1.).f), 2)
+        self.assertEqual(len(Chebfun([1.]).x), 2)
+        self.assertEqual(len(Chebfun([1.]).f), 2)
+        self.assertEqual(len(Chebfun([1., 2.]).x), 2)
+        self.assertEqual(len(Chebfun([1., 2.]).f), 2)
+        self.assertEqual(len(Chebfun([1., 2., 3.]).x), 3)
+        self.assertEqual(len(Chebfun([1., 2., 3.]).f), 3)
+        # Init with function
+        cfrung = Chebfun(runge)
+        self.assertEqual(len(cfrung.x), len(cfrung.f))
+        cfrung = Chebfun(cfrung)
+        self.assertEqual(len(cfrung.x), len(cfrung.f))
+        # Init with chebyshev polynomial coefficients
+        cfcoeff = Chebfun(None, 0, [1., 0.])
+        self.assertEqual(len(cfcoeff.x), len(cfcoeff.f))
+
+    def test_constant(self):
+        self.assertEqual(Chebfun(1.), Chebfun([1.]))
+        self.assertEqual(Chebfun(1.), Chebfun([1., 1.]))
+        self.assertEqual(Chebfun(1.), Chebfun([1., 1., 1.]))
+        self.assertEqual(Chebfun(1.), Chebfun([1., 1., 1., 1.]))
+        self.assertEqual(Chebfun(1.), Chebfun([1., 1., 1., 1., 1.]))
+        self.assertEqual(Chebfun(1.), Chebfun([1.]*137))
+
     def test_len(self):
         self.assertEqual(len(self.p), len(self.p.chebyshev_coefficients()))
 
@@ -93,14 +120,6 @@ class Test_Chebfun(unittest.TestCase):
 
     def test_chebcoeffplot(self):
         self.p.chebcoeffplot()
-
-    def test_constant(self):
-        self.assertEqual(Chebfun(1.), Chebfun([1.]))
-        self.assertEqual(Chebfun(1.), Chebfun([1., 1.]))
-        self.assertEqual(Chebfun(1.), Chebfun([1., 1., 1.]))
-        self.assertEqual(Chebfun(1.), Chebfun([1., 1., 1., 1.]))
-        self.assertEqual(Chebfun(1.), Chebfun([1., 1., 1., 1., 1.]))
-        self.assertEqual(Chebfun(1.), Chebfun([1.]*137))
 
     def test_prod(self):
         pp = self.p*self.p
