@@ -37,6 +37,24 @@ def piecewise_continuous(x):
     """
     return np.exp(x)*np.sin(3*x)*np.tanh(5*np.cos(30*x))
 
+def gaussian_function(Bc):
+    """
+    Gaussian function.
+    """
+    return Chebfun(lambda x : np.exp(-0.5*Bc*x*x))
+
+def problem_functions(N, Bc):
+    """
+    Returns two functions such that when the second is subtracted from
+    the first, Chebfun does not converge.
+    """
+    ustart = 0.99999
+
+    H = Chebfun([Bc*0.25])*gaussian_function(Bc)
+    U = gaussian_function(Bc)
+
+    return ((Bc*ustart)*U), ((1.+ 3.*ustart**4)*H)
+
 def runge(x):
     return 1./(1+25*x**2)
 
@@ -44,7 +62,7 @@ def runge(x):
 def zero(x):
     return 0.
 @np.vectorize
-def constFunc(val, x):
+def const_func(val, x):
     return val
 
 xs = np.linspace(-1,1,1000)
@@ -187,6 +205,15 @@ class Test_Chebfun(unittest.TestCase):
 
 
 class Test_Misc(unittest.TestCase):
+    def test_add_sub_convergence(self):
+        pa, pb = problem_functions(30, 125.13)
+        # Does not converge: Chebfun(lambda x: pa(x)-pb(x))
+        # But should:
+        cf = pa - pb
+        self.assertEqual(len(cf), max(len(pa), len(pb))+1)
+        cf = pa + (-pb)
+        self.assertEqual(len(cf), max(len(pa), len(pb))+1)
+
     def test_truncate(self, N=17):
         """
         Check that the Chebyshev coefficients are properly truncated.
@@ -276,14 +303,14 @@ class Test_Arithmetic(unittest.TestCase):
         self.assertEqual(3*cf, 6)
         self.assertEqual(3.14159*cf, 6.28318)
         self.assertEqual(len(cf), 2)
-        self.assertEqual(len(Chebfun(lambda x: constFunc(1.,x))), 2)
-        self.assertEqual(len(Chebfun(lambda x: constFunc(-2.71828,x))), 2)
-        self.assertEqual(len(Chebfun(lambda x: constFunc(0.,x))), 2)
+        self.assertEqual(len(Chebfun(lambda x: const_func(1.,x))), 2)
+        self.assertEqual(len(Chebfun(lambda x: const_func(-2.71828,x))), 2)
+        self.assertEqual(len(Chebfun(lambda x: const_func(0.,x))), 2)
         self.assertEqual(len(Chebfun(Chebfun(zero))), 2)
 
     def test_mul(self):
         self.assertEqual(self.p1*Chebfun(zero), Chebfun(zero))
-        self.assertEqual(self.p1*Chebfun(lambda x: constFunc(1., x)), self.p1)
+        self.assertEqual(self.p1*Chebfun(lambda x: const_func(1., x)), self.p1)
 
     def test_scalar_mul(self):
         self.assertEqual(self.p1, self.p1)
