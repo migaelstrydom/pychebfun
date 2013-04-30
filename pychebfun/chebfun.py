@@ -247,7 +247,6 @@ class Chebfun(object):
         """
         Chebfun multiplication.
         """
-        #print('multiplied', self, other)
         return Chebfun(lambda x: self(x) * other(x),)
 
     __rmul__ = __mul__
@@ -346,13 +345,17 @@ class Chebfun(object):
         # If a_i and b_i are the kth Chebyshev polynomial expansion coefficient
         # Then b_{i-1} = b_{i+1} + 2ia_i; b_N = b_{N+1} = 0; b_0 = b_2/2 + a_1
 
-        N = len(self.ai)
+        N = len(self.ai) - 1
+        if N == 0: # Special case: derivative = const
+            deriv = (self.f[1]-self.f[0])/(self.x[1]-self.x[0])
+            return Chebfun(deriv)
 
-        bi = np.array([2.*(N-1)*self.ai[-2], 2.*N*self.ai[-1]])
+        bi = np.zeros(N+1)
+        bi[N-1] = 2*N*self.ai[N]
+        for i in xrange(N-2, 0, -1):
+            bi[i] = bi[i+2] + 2*(i+1)*self.ai[i+1]
 
-        for i in np.arange(N-2, 1, -1):
-            bi = np.append(bi[1] + 2.*i*self.ai[i], bi)
-        bi = np.append(bi[1]/2. + self.ai[1], bi)
+        bi[0] = bi[2]*0.5 + self.ai[1]
 
         return Chebfun(self, chebcoeff=bi)
 

@@ -192,6 +192,29 @@ class Test_Chebfun(unittest.TestCase):
         expected = Chebfun(fd)
         npt.assert_allclose(computed(xs), expected(xs),)
 
+        npt.assert_allclose(
+            Chebfun(lambda x: const_func(-3.141, x)).differentiate()(xs),
+            Chebfun(0.)(xs))
+        for n in xrange(2, 11):
+            cf = Chebfun(lambda x: x**n)
+            self.assertEqual(np.max(np.abs(
+                Chebfun(lambda x: n*x**(n-1))(xs)-cf.differentiate()(xs))) <
+                128*emach,
+                True)
+        npt.assert_allclose(
+            Chebfun(lambda x: 3.141*x*x).differentiate()(xs),
+            Chebfun(lambda x: 6.282*x)(xs))
+        npt.assert_allclose(
+            Chebfun(np.sin).differentiate()(xs),
+            Chebfun(np.cos)(xs))
+        npt.assert_allclose(
+            Chebfun(lambda x: np.exp(7.*np.sin(3.*x))).differentiate()(xs),
+            Chebfun(lambda x: 21.*np.cos(3.*x)*np.exp(7.*np.sin(3.*x)))(xs),
+            1e-07, 1e-07)
+        npt.assert_allclose(
+            Chebfun(lambda x: np.exp(-0.5*x*x)).differentiate()(xs),
+            Chebfun(lambda x: -x*np.exp(-0.5*x*x))(xs))
+
     def test_interp_values(self):
         """
         Instanciate Chebfun from interpolation values.
