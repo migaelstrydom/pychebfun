@@ -152,7 +152,7 @@ class Test_Chebfun(unittest.TestCase):
 
     def test_chebyshev_points(self):
         N = pow(2,5)
-        pts = self.p.interpolation_points(N)
+        pts = self.p.interpolation_points(N, [-1., 1.])
         npt.assert_array_almost_equal(pts[[0,-1]],np.array([1.,-1]))
 
     def test_N(self):
@@ -228,15 +228,6 @@ class Test_Chebfun(unittest.TestCase):
 
 
 class Test_Misc(unittest.TestCase):
-    def test_add_sub_convergence(self):
-        pa, pb = problem_functions(30, 125.13)
-        # Does not converge: Chebfun(lambda x: pa(x)-pb(x))
-        # But should:
-        cf = pa - pb
-        self.assertEqual(len(cf), max(len(pa), len(pb))+1)
-        cf = pa + (-pb)
-        self.assertEqual(len(cf), max(len(pa), len(pb))+1)
-
     def test_truncate(self, N=17):
         """
         Check that the Chebyshev coefficients are properly truncated.
@@ -350,12 +341,80 @@ class Test_Arithmetic(unittest.TestCase):
         b = self.p2 - self.p1
         self.assertEqual(a+b,0)
 
-    @unittest.expectedFailure
-    @unittest.expectedFailure
-    def test_neg(self):
-        rm = -self.p2
-        z = self.p2 + rm
+    def test_add_coeffs(self):
+        cfa = Chebfun(lambda x: np.sin(x)**2)
+        cfb = Chebfun(lambda x: np.cos(x)**2)
+        cfs = cfa + cfb
+        self.assertEqual(cfs, Chebfun(lambda x: const_func(1., x)))
+        self.assertEqual(len(cfs), 2)
 
+    def test_add_sub_convergence(self):
+        pa, pb = problem_functions(30, 125.13)
+        # Does not converge: Chebfun(lambda x: pa(x)-pb(x))
+        # But should:
+        cf = pa - pb
+        self.assertEqual(len(cf), max(len(pa), len(pb))+1)
+        cf = pa + (-pb)
+        self.assertEqual(len(cf), max(len(pa), len(pb))+1)
+
+    def test_neg(self):
+        cfa = Chebfun(np.cos)
+        cfb = Chebfun(lambda x: -np.cos(x))
+        self.assertEqual(-cfa, cfb)
+
+
+
+class Test_Interval(unittest.TestCase):
+
+    def test_intersect(self):
+        npt.assert_equal(
+            Chebfun.intersect_intervals([-5., 0.], [-2., 3.]),
+            np.array([-2., 0.]))
+        npt.assert_equal(
+            Chebfun.intersect_intervals([-5., 5.], [-5., 5.]),
+            np.array([-5., 5.]))
+        npt.assert_equal(
+            Chebfun.intersect_intervals([-5., 4.], [4., 5.]),
+            np.array([4., 4.]))
+        npt.assert_equal(
+            Chebfun.intersect_intervals([-5., -4.], [4., 5.]),
+            np.array([0., 0.]))
+
+    def test_init_with_lambda(self):
+        cf = Chebfun(lambda x: x*x, interval=[0., 2.])
+        cfm1 = Chebfun(lambda x: (x+1.)**2)
+        self.assertEqual(len(cf), 3)
+        npt.assert_allclose(cf.x, np.linspace(2., 0., 3))
+        npt.assert_allclose(cf.f, np.linspace(2., 0., 3)**2)
+        npt.assert_equal(cf.chebyshev_coefficients(), 
+                         cfm1.chebyshev_coefficients())
+
+    def test_init_with_array(self):
+        cf = Chebfun([0., 0., 1., 0., 0.], interval=[-3.141, 6.282])
+        cfi1 = Chebfun([0., 0., 1., 0., 0.], interval=[-1., 1.])
+        self.assertEqual(cf((-3.141+6.282)*0.5), 1.0)
+        npt.assert_equal(cf.f, np.array([0., 0., 1., 0., 0.]))
+        npt.assert_equal(cf.chebyshev_coefficients(), 
+                         cfi1.chebyshev_coefficients())
+
+    def test_init_with_coeffs(self):
+        xs1 = np.linspace(-1., 1., 1000)
+        xs2 = np.linspace(3., 7., 1000)
+        cf = Chebfun(chebcoeff=[0., 1.], interval=[3., 7.])
+        cfp = chebpoly(1)
+        npt.assert_allclose(cf(xs2), cfp(xs1), rtol=1e-11)
+
+    def test_add(self):
+        cfa = Chebfun(lambda x: np.sin(x)**2, interval=[-10., 10.])
+        cfb = Chebfun(lambda x: np.cos(x)**2, interval=[1., 9.])
+        cfs = cfa + cfb
+        npt.assert_equal(cfs.interval, cfb.interval)
+        self.assertEqual(Chebfun(1., interval=cfb.interval), cfs)
+        cfa2 = Chebfun(lambda x: np.sin(x)**2, interval=[-10., 2.])
+        cfb2 = Chebfun(lambda x: np.cos(x)**2, interval=[1., 9.])
+        cfs2 = cfa2+cfb2
+        npt.assert_equal(cfs2.interval, [1., 2.])
+        self.assertEqual(Chebfun(1., interval=[1., 2.]), cfs)
 
 
 if __name__ == '__main__':
