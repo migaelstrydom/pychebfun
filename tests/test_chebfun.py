@@ -386,7 +386,7 @@ class Test_Interval(unittest.TestCase):
         self.assertEqual(len(cf), 3)
         npt.assert_allclose(cf.x, np.linspace(2., 0., 3))
         npt.assert_allclose(cf.f, np.linspace(2., 0., 3)**2)
-        npt.assert_equal(cf.chebyshev_coefficients(), 
+        npt.assert_equal(cf.chebyshev_coefficients(),
                          cfm1.chebyshev_coefficients())
 
     def test_init_with_array(self):
@@ -394,14 +394,14 @@ class Test_Interval(unittest.TestCase):
         cfi1 = Chebfun([0., 0., 1., 0., 0.], interval=[-1., 1.])
         self.assertEqual(cf((-3.141+6.282)*0.5), 1.0)
         npt.assert_equal(cf.f, np.array([0., 0., 1., 0., 0.]))
-        npt.assert_equal(cf.chebyshev_coefficients(), 
+        npt.assert_equal(cf.chebyshev_coefficients(),
                          cfi1.chebyshev_coefficients())
 
     def test_init_with_coeffs(self):
         xs1 = np.linspace(-1., 1., 1000)
         xs2 = np.linspace(3., 7., 1000)
-        cf = Chebfun(chebcoeff=[0., 1.], interval=[3., 7.])
-        cfp = chebpoly(1)
+        cf = Chebfun(chebcoeff=[0., 0., 1.], interval=[3., 7.])
+        cfp = chebpoly(2)
         npt.assert_allclose(cf(xs2), cfp(xs1), rtol=1e-11)
 
     def test_add(self):
@@ -411,10 +411,79 @@ class Test_Interval(unittest.TestCase):
         npt.assert_equal(cfs.interval, cfb.interval)
         self.assertEqual(Chebfun(1., interval=cfb.interval), cfs)
         cfa2 = Chebfun(lambda x: np.sin(x)**2, interval=[-10., 2.])
-        cfb2 = Chebfun(lambda x: np.cos(x)**2, interval=[1., 9.])
-        cfs2 = cfa2+cfb2
-        npt.assert_equal(cfs2.interval, [1., 2.])
-        self.assertEqual(Chebfun(1., interval=[1., 2.]), cfs)
+        cfb2 = Chebfun(lambda x: np.cos(x)**2, interval=[1.1, 9.])
+        cfs2 = cfa2 + cfb2
+        npt.assert_equal(cfs2.interval, [1.1, 2.])
+        self.assertEqual(Chebfun(1., interval=[1.1, 2.]), cfs2)
+
+    def test_subtract(self):
+        cfa = Chebfun(lambda x: np.sin(x)**2, interval=[-10., 10.])
+        cfb = Chebfun(lambda x: -np.cos(x)**2, interval=[1., 9.])
+        cfs = cfa - cfb
+        npt.assert_equal(cfs.interval, cfb.interval)
+        self.assertEqual(Chebfun(1., interval=cfb.interval), cfs)
+        cfa2 = Chebfun(lambda x: np.sin(x)**2, interval=[-10., 2.])
+        cfb2 = Chebfun(lambda x: -np.cos(x)**2, interval=[1.1, 9.])
+        cfs2 = cfa2 - cfb2
+        npt.assert_equal(cfs2.interval, [1.1, 2.])
+        self.assertEqual(Chebfun(1., interval=[1.1, 2.]), cfs2)
+
+    def test_multiply(self):
+        cfa = Chebfun(lambda x: np.exp(x), interval=[-10., 10.])
+        cfb = Chebfun(lambda x: np.exp(-x), interval=[1., 9.])
+        cfs = cfa * cfb
+        npt.assert_equal(cfs.interval, cfb.interval)
+        self.assertEqual(Chebfun(1., interval=cfb.interval), cfs)
+        cfa2 = Chebfun(lambda x: np.exp(x), interval=[-10., 2.])
+        cfb2 = Chebfun(lambda x: np.exp(-x), interval=[1.1, 9.])
+        cfs2 = cfa2 * cfb2
+        npt.assert_equal(cfs2.interval, [1.1, 2.])
+        self.assertEqual(Chebfun(1., interval=[1.1, 2.]), cfs2)
+
+    def test_divide(self):
+        cfa = Chebfun(lambda x: np.sin(x), interval=[-1.56, 1.5])
+        cfb = Chebfun(lambda x: np.cos(x), interval=[1., 1.3])
+        cfs = cfa / cfb
+        npt.assert_equal(cfs.interval, cfb.interval)
+        self.assertEqual(Chebfun(lambda x: np.tan(x), interval=cfb.interval), cfs)
+        cfa2 = Chebfun(lambda x: np.sin(x), interval=[-1.55, 1.1])
+        cfb2 = Chebfun(lambda x: np.cos(x), interval=[1., 1.3])
+        cfs2 = cfa2 / cfb2
+        npt.assert_equal(cfs2.interval, [1., 1.1])
+        self.assertEqual(Chebfun(np.tan, interval=[1., 1.1]), cfs2)
+
+    def test_differentiate(self):
+        inter = [-3.141, 2.71828]
+        xs = np.linspace(inter[0], inter[1], 500)
+
+        npt.assert_allclose(
+            Chebfun(lambda x: const_func(-3.141, x),
+                interval=inter).differentiate()(xs),
+            Chebfun(0., interval=inter)(xs))
+        for n in xrange(2, 11):
+            cf = Chebfun(lambda x: x**n, interval=inter)
+            self.assertEqual(np.max(np.abs(
+                Chebfun(lambda x: n*x**(n-1), interval=inter)(xs)
+                    - cf.differentiate()(xs))) <
+                1e-9,
+                True)
+        npt.assert_allclose(
+            Chebfun(lambda x: 3.141*x*x, interval=inter).differentiate()(xs),
+            Chebfun(lambda x: 6.282*x, interval=inter)(xs))
+        npt.assert_allclose(
+            Chebfun(np.sin, interval=inter).differentiate()(xs),
+            Chebfun(np.cos, interval=inter)(xs))
+        npt.assert_allclose(
+            Chebfun(lambda x: np.exp(7.*np.sin(3.*x)),
+                interval=inter).differentiate()(xs),
+            Chebfun(lambda x: 21.*np.cos(3.*x)*np.exp(7.*np.sin(3.*x)),
+                interval=inter)(xs),
+            1e-07, 1e-07)
+        npt.assert_allclose(
+            Chebfun(lambda x: np.exp(-0.5*x*x),
+                interval=inter).differentiate()(xs),
+            Chebfun(lambda x: -x*np.exp(-0.5*x*x),
+                interval=inter)(xs))
 
 
 if __name__ == '__main__':

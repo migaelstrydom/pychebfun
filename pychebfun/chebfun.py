@@ -47,7 +47,8 @@ class Chebfun(object):
                                f on domain x.
     """
     max_nb_dichotomy = 12 # maximum number of dichotomy of the interval
-
+    plot_res = 1000 # Number of points to use when plotting
+    record = False # whether to record convergence information
 
     class NoConvergence(Exception):
         """
@@ -118,7 +119,7 @@ class Chebfun(object):
             if not N: # N is not provided
                 # Find out the right number of coefficients to keep
                 coeffs = \
-                    self.get_optimal_coefficients(f, 
+                    self.get_optimal_coefficients(f,
                                                   pow(2, self.max_nb_dichotomy),
                                                   self.interval)
                 N = len(coeffs)-1
@@ -137,8 +138,6 @@ class Chebfun(object):
             self.p  = Bary(self.x, self.f)
 
 
-    record = False # whether to record convergence information
-
     @classmethod
     def interpolation_points(self, N, interval):
         """
@@ -150,7 +149,7 @@ class Chebfun(object):
 
     @classmethod
     def intersect_intervals(self, inta, intb):
-        intersection = np.array([max(inta[0], intb[0]), 
+        intersection = np.array([max(inta[0], intb[0]),
                                  min(inta[1], intb[1])])
 
         if intersection[0] > intersection[1]:
@@ -241,8 +240,8 @@ class Chebfun(object):
     def __eq__(self, other):
         if np.isscalar(other):
             other = Chebfun(other)
-        return not(self - other) and \
-            np.allclose(self.interval, other.interval)
+        return np.allclose(self.interval, other.interval) and \
+                not(self - other)
 
     def __neq__(self, other):
         return not (self == other)
@@ -294,7 +293,7 @@ class Chebfun(object):
         sum_interval = self.intersect_intervals(self.interval, other.interval)
         if sum_interval[0] == sum_interval[1]:
             sum_interval = self.interval
-        return Chebfun(lambda x: self(x) * other(x), 
+        return Chebfun(lambda x: self(x) * other(x),
                        interval=sum_interval)
 
     __rmul__ = __mul__
@@ -413,8 +412,9 @@ class Chebfun(object):
             bi[i] = bi[i+2] + 2*(i+1)*self.ai[i+1]
 
         bi[0] = bi[2]*0.5 + self.ai[1]
+        bi = bi*(2./(self.interval[1]-self.interval[0]))
 
-        return Chebfun(self, chebcoeff=bi)
+        return Chebfun(self, chebcoeff=bi, interval=self.interval)
 
     def roots(self):
         """
@@ -427,17 +427,16 @@ class Chebfun(object):
         roots = np.array([np.real(r) for r in zNq.roots if np.allclose(abs(r), 1.)])
         return np.unique(roots)
 
-    plot_res = 1000
-
     def plot(self, interpolation_points=True, *args, **kwargs):
-        xs = np.linspace(self.interval[0], self.interval[1], 
+        xs = np.linspace(self.interval[0], self.interval[1],
                          self.plot_res)
+
         axis = plt.gca()
         axis.plot(xs, self(xs), *args, **kwargs)
         if interpolation_points:
             # figure out current colour
-            current_color = axis.lines[-1].get_color() 
-            axis.plot(self.x, self.f, 
+            current_color = axis.lines[-1].get_color()
+            axis.plot(self.x, self.f,
                       marker='.', linestyle='', color=current_color)
         plt.plot()
 
