@@ -485,6 +485,12 @@ class Test_Interval(unittest.TestCase):
             Chebfun(lambda x: -x*np.exp(-0.5*x*x),
                 interval=inter)(xs))
 
+    def test_arithmetic_with_scalar(self):
+        inter = [-3.141, 2.71828]
+        npt.assert_equal((2. + Chebfun(1., interval=inter)).interval, inter)
+        npt.assert_equal((2. - Chebfun(1., interval=inter)).interval, inter)
+        npt.assert_equal((2. * Chebfun(1., interval=inter)).interval, inter)
+        npt.assert_equal((2. / Chebfun(1., interval=inter)).interval, inter)
 
 if __name__ == '__main__':
     unittest.main()

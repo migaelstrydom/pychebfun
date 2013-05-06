@@ -28,7 +28,7 @@ def cast_scalar(method):
     @wraps(method)
     def new_method(self, other):
         if np.isscalar(other):
-            other = Chebfun([float(other)])
+            other = Chebfun([float(other)], interval=self.interval)
         return method(self, other)
     return new_method
 
