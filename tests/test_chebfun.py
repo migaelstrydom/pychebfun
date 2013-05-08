@@ -101,7 +101,7 @@ class Test_Chebfun(unittest.TestCase):
         self.assertEqual(Chebfun(1.), Chebfun([1.]*137))
 
     def test_len(self):
-        self.assertEqual(len(self.p), len(self.p.chebyshev_coefficients()))
+        self.assertEqual(len(self.p), len(self.p.coefficients()))
 
     def test_error(self):
         x = xs
@@ -136,8 +136,8 @@ class Test_Chebfun(unittest.TestCase):
     def test_cheb_plot(self):
         self.p.compare(f)
 
-    def test_chebcoeffplot(self):
-        self.p.chebcoeffplot()
+    def test_coefficient_plot(self):
+        self.p.coefficient_plot()
 
     def test_prod(self):
         pp = self.p*self.p
@@ -158,10 +158,11 @@ class Test_Chebfun(unittest.TestCase):
     def test_N(self):
         N = len(self.p) - 1
         pN = Chebfun(f, N)
-        self.assertEqual(len(pN.chebyshev_coefficients()), N+1)
-        self.assertEqual(len(pN.chebyshev_coefficients()),len(pN))
+        self.assertEqual(len(pN.coefficients()), N+1)
+        self.assertEqual(len(pN.coefficients()),len(pN))
         npt.assert_array_almost_equal(pN(xs), self.p(xs))
-        npt.assert_array_almost_equal(pN.chebyshev_coefficients(),self.p.chebyshev_coefficients())
+        npt.assert_array_almost_equal(pN.coefficients(),
+                                      self.p.coefficients())
 
     def test_record(self):
         p = Chebfun(f)
@@ -263,11 +264,11 @@ class Test_Misc(unittest.TestCase):
         """
         for n in ns:
             c = chebpoly(n)
-            npt.assert_array_almost_equal(c.chebyshev_coefficients(), [0]*n+[1.])
+            npt.assert_array_almost_equal(c.coefficients(), [0]*n+[1.])
 
     def test_list_init(self):
         c = Chebfun([1.])
-        npt.assert_array_almost_equal(c.chebyshev_coefficients(),[1.])
+        npt.assert_array_almost_equal(c.coefficients(),[1.])
 
     def test_scalar_init(self):
         one = Chebfun(1.)
@@ -386,16 +387,16 @@ class Test_Interval(unittest.TestCase):
         self.assertEqual(len(cf), 3)
         npt.assert_allclose(cf.x, np.linspace(2., 0., 3))
         npt.assert_allclose(cf.f, np.linspace(2., 0., 3)**2)
-        npt.assert_equal(cf.chebyshev_coefficients(),
-                         cfm1.chebyshev_coefficients())
+        npt.assert_equal(cf.coefficients(),
+                         cfm1.coefficients())
 
     def test_init_with_array(self):
         cf = Chebfun([0., 0., 1., 0., 0.], interval=[-3.141, 6.282])
         cfi1 = Chebfun([0., 0., 1., 0., 0.], interval=[-1., 1.])
         self.assertEqual(cf((-3.141+6.282)*0.5), 1.0)
         npt.assert_equal(cf.f, np.array([0., 0., 1., 0., 0.]))
-        npt.assert_equal(cf.chebyshev_coefficients(),
-                         cfi1.chebyshev_coefficients())
+        npt.assert_equal(cf.coefficients(),
+                         cfi1.coefficients())
 
     def test_init_with_coeffs(self):
         xs1 = np.linspace(-1., 1., 1000)
