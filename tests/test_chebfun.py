@@ -130,7 +130,7 @@ class Test_Chebfun(unittest.TestCase):
         self.assertEqual(len(a.lines),1)
 
     def test_chebcoeff(self):
-        new = Chebfun(chebcoeff=self.p.ai)
+        new = Chebfun(coeffs=self.p.ai)
         npt.assert_allclose(self.p(xs), new(xs))
 
     def test_cheb_plot(self):
@@ -401,7 +401,7 @@ class Test_Interval(unittest.TestCase):
     def test_init_with_coeffs(self):
         xs1 = np.linspace(-1., 1., 1000)
         xs2 = np.linspace(3., 7., 1000)
-        cf = Chebfun(chebcoeff=[0., 0., 1.], interval=[3., 7.])
+        cf = Chebfun(coeffs=[0., 0., 1.], interval=[3., 7.])
         cfp = chebpoly(2)
         npt.assert_allclose(cf(xs2), cfp(xs1), rtol=1e-11)
 

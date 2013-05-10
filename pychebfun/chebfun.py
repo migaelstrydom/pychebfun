@@ -30,20 +30,22 @@ class Chebfun(Pointfun):
     For a Chebfun object, the following properties are always defined:
     numpy.array x: The Chebyshev points on which the Chebfun is defined.
     numpy.array f: The values of the Chebfun at points x.
+    numpy.array interval: The interval on which the function is defined. Note
+        that interval[0] == x[0] and interval[1] == x[-1].
     numpy.array ai: The Chebyshev polynomial coefficients of the function
                     when rescaled to be defined on [-1, 1]
     BarycentricInterpolator p: A polynomial interpolation through points
                                f on domain x.
     """
 
-    def __init__(self, f=None, N=0, chebcoeff=None, interval=[-1.,1.]):
+    def __init__(self, f=None, N=0, coeffs=None, interval=[-1.,1.]):
         """
         Create a Chebyshev polynomial approximation of the function $f$ on
         the interval :math:`[-1, 1]`.
 
         :param callable f: Python, Numpy, or Sage function
         :param int N: (default = None)  specify number of interpolating points
-        :param np.array chebcoeff: (default = np.array(0)) specify the
+        :param np.array coeffs: (default = np.array(0)) specify the
                coefficients of a Chebfun
         :param list interval: The domain on which the Chebfun is defined.
         """
@@ -83,11 +85,12 @@ class Chebfun(Pointfun):
             self.x = f.x
             self.f = f.f
             self.p = f.p
+            self.interval = f.interval
 
-        if chebcoeff is not None: # if the coefficients of a Chebfun are given
+        if coeffs is not None: # if the coefficients of a Chebfun are given
 
-            self.N = N = len(chebcoeff) - 1
-            self.ai = np.array(chebcoeff)
+            N = len(coeffs) - 1
+            self.ai = np.array(coeffs)
             if N == 0:
                 self.x = self.interpolation_points(1, self.interval)
                 self.f = np.array([self.ai[0], self.ai[0]])
@@ -135,13 +138,13 @@ class Chebfun(Pointfun):
             N = N*2
 
             coeffs = self.cheb_poly_fit_function(f, N, interval)
-            absMaxCoeff = np.max(np.abs(coeffs))
+            abs_max_coeff = np.max(np.abs(coeffs))
             # Special case: check for the zero function
-            if absMaxCoeff < 2*emach:
+            if abs_max_coeff < 2*emach:
                 return np.array([0.])
             # Check for negligible coefficients
             # If within bound: get negligible coeffs and break
-            bnd = 128*emach*absMaxCoeff
+            bnd = 128*emach*abs_max_coeff
             if self.record:
                 self.bnds.append(bnd)
                 self.intermediate.append(coeffs)
@@ -186,8 +189,7 @@ class Chebfun(Pointfun):
         """
         if len(f) == 1:
             return np.array(f)
-        evened = even_data(f)
-        coeffs = dct(evened)
+        coeffs = dct(even_data(f))
         return coeffs
 
     def __repr__(self):
@@ -246,7 +248,7 @@ class Chebfun(Pointfun):
         bi[0] = bi[2]*0.5 + self.ai[1]
         bi = bi*(2./(self.interval[1]-self.interval[0]))
 
-        return Chebfun(self, chebcoeff=bi, interval=self.interval)
+        return Chebfun(self, coeffs=bi, interval=self.interval)
 
     def roots(self):
         """

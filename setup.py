@@ -85,17 +85,7 @@ class test_pychebfun(Command):
 
 
 # Define included modules and tests
-modules = [
-    'pychebfun.core',
-    'pychebfun.analysis',
-    'pychebfun.utilities',
-    ]
-
-#tests = [
-#    'pychebfun.core.tests',
-#    'pychebfun.analysis.tests',
-#    'pychebfun.utilities.tests',
-#    ]
+modules = []
 tests = []
 
 setup(
