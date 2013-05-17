@@ -23,6 +23,17 @@ from scipy.interpolate import BarycentricInterpolator as Bary
 
 from pointfun import *
 
+def cast_scalar(method):
+    """
+    Used to cast scalar to the Pointfuns
+    """
+    @wraps(method)
+    def new_method(self, other):
+        if np.isscalar(other):
+            other = self.__class__([float(other)], interval=self.interval)
+        return method(self, other)
+    return new_method
+
 class Chebfun(Pointfun):
     """
     Construct a Lagrange interpolating polynomial over the Chebyshev points.
@@ -194,6 +205,137 @@ class Chebfun(Pointfun):
 
     def __repr__(self):
         return "<Chebfun({0})>".format(len(self))
+
+    #
+    # Basic Operator Overloads
+    #
+    def __nonzero__(self):
+        """
+        Test for difference from zero (up to tolerance)
+        """
+        return not np.allclose(self.coefficients(), 0.)
+
+    @cast_scalar
+    def __eq__(self, other):
+        return np.allclose(self.interval, other.interval) and \
+                not(self - other)
+
+    def __neq__(self, other):
+        return not (self == other)
+
+    @cast_scalar
+    def __add__(self, other):
+        """
+        Addition
+        """
+        sum_interval = self.intersect_intervals(self.interval, other.interval)
+        if sum_interval[0] == sum_interval[1]:
+            sum_interval = self.interval
+
+        return self.__class__(None, 0,
+                       self.get_optimal_coefficients(
+                lambda x: self(x) + other(x),
+                max(len(self), len(other)),
+                sum_interval),
+                       interval=sum_interval)
+
+    __radd__ = __add__
+
+
+    @cast_scalar
+    def __sub__(self, other):
+        """
+        Subtraction.
+        """
+        sum_interval = self.intersect_intervals(self.interval, other.interval)
+        if sum_interval[0] == sum_interval[1]:
+            sum_interval = self.interval
+
+        return self.__class__(None, 0,
+                       self.get_optimal_coefficients(
+                lambda x: self(x) - other(x),
+                max(len(self), len(other)),
+                sum_interval),
+                       interval=sum_interval)
+
+    def __rsub__(self, other):
+        return -(self - other)
+
+
+    @cast_scalar
+    def __mul__(self, other):
+        """
+        Chebfun multiplication.
+        """
+        sum_interval = self.intersect_intervals(self.interval, other.interval)
+        if sum_interval[0] == sum_interval[1]:
+            sum_interval = self.interval
+        return self.__class__(lambda x: self(x) * other(x),
+                       interval=sum_interval)
+
+    __rmul__ = __mul__
+
+    @cast_scalar
+    def __div__(self, other):
+        """
+        Chebfun division
+        """
+        sum_interval = self.intersect_intervals(self.interval, other.interval)
+        if sum_interval[0] == sum_interval[1]:
+            sum_interval = self.interval
+        return self.__class__(lambda x: self(x) / other(x),
+                       interval=sum_interval)
+
+    __truediv__ = __div__
+
+    @cast_scalar
+    def __rdiv__(self, other):
+        sum_interval = self.intersect_intervals(self.interval, other.interval)
+        if sum_interval[0] == sum_interval[1]:
+            sum_interval = self.interval
+        return self.__class__(lambda x: other(x)/self(x),
+                       interval=sum_interval)
+
+    __rtruediv__ = __rdiv__
+
+    def __neg__(self):
+        """
+        Negation.
+        """
+        return self.__class__(lambda x: -self(x), interval=self.interval)
+
+    def __pow__(self, other):
+        return self.__class__(lambda x: self(x)**other, interval=self.interval)
+
+
+    def sqrt(self):
+        """
+        Square root of Pointfun.
+        """
+        return self.__class__(lambda x: np.sqrt(self(x)), 
+                              interval=self.interval)
+
+    def __abs__(self):
+        """
+        Absolute value of Pointfun. (Python)
+
+        (Coerces to NumPy absolute value.)
+        """
+        return self.__class__(lambda x: np.abs(self(x)),
+                              interval=self.interval)
+
+    def abs(self):
+        """
+        Absolute value of Pointfun. (NumPy)
+        """
+        return self.__abs__()
+
+    def sin(self):
+        """
+        Sine of Pointfun
+        """
+        return self.__class__(lambda x: np.sin(self(x)),interval=self.interval)
+
 
     #
     # Numpy / Scipy Operator Overloads

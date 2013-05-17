@@ -19,9 +19,22 @@ import matplotlib.pyplot as plt
 import sys
 from functools import wraps
 
-from scipy.interpolate import BarycentricInterpolator as Bary
+# Use linear interpolation for speed.
+from scipy.interpolate import interp1d as FInterp
 
 from pointfun import *
+
+def cast_scalar(method):
+    """
+    Used to cast scalar to the Pointfuns
+    """
+    @wraps(method)
+    def new_method(self, other):
+        if np.isscalar(other):
+            other = self.__class__([float(other)]*len(self), 
+                                   interval=self.interval)
+        return method(self, other)
+    return new_method
 
 class Foufun(Pointfun):
     """
@@ -39,10 +52,17 @@ class Foufun(Pointfun):
                                f on domain x.
     """
 
-    def __init__(self, f=None, N=0, coeffs=None, interval=[-np.pi, np.pi]):
+    class UnmatchingDimensions(Exception):
+        """
+        Raised when performing operations on two Foufuns that are
+        not defined on the same interval or have differing numbers 
+        of points.
+        """
+
+    def __init__(self, f=None, N=0, coeffs=None, interval=[0., 2*np.pi]):
         """
         Create a Fourier series approximation of the function $f$ on
-        the interval :math:`[-pi, pi]`. 
+        the interval :math:`[0, 2*pi]`. 
 
         :param callable f: Python, Numpy, or Sage function
         :param int N: (default = None) specify number of interpolating points
@@ -60,11 +80,17 @@ class Foufun(Pointfun):
 
         self.interval = np.array(interval)
 
+        f_is_list = False
+
+        # Check if f is iterable
         try:
             i = iter(f) # interpolation values provided
         except TypeError:
             pass
         else:
+            f_is_list = True
+
+        if f_is_list:
             vals = np.array(f)
 
             N = len(vals)
@@ -74,50 +100,37 @@ class Foufun(Pointfun):
             self.f = vals.copy()
             self.x = self.interpolation_points(N, self.interval)
 
-            self.p  = Bary(self.x, self.f)
-
-            return None
-
-        if isinstance(f, Foufun): # copy if f is another Chebfun
+        elif isinstance(f, Foufun): # copy if f is another Chebfun
             self.ai = f.ai.copy()
             self.x = f.x
             self.f = f.f
             self.p = f.p
             self.interval = f.interval
+            return None
 
-        if coeffs is not None: # if the coefficients of a Chebfun are given
+        elif coeffs is not None: # if the coefficients of a Chebfun are given
 
-            N = len(coeffs)
-            self.ai = np.array(coeffs)
-            self.x = self.interpolation_points(N, self.interval)
+            N = 2*(len(coeffs)-1)
+            self.ai = np.array(coeffs).astype(complex)
 
-            if N == 1:
-                self.f = np.array([self.ai[0]])
-            else:
-                self.f = np.fft.irfft(self.ai, len(self.ai))
-            self.p = Bary(self.x, self.f)
-
-        else: # if the coefficients of a Foufun are not given
-            if not N: # N is not provided
-                # Find the right number of coefficients to keep
-                coeffs = \
-                    self.get_optimal_coefficients(f,
-                                                  pow(2, self.max_nb_dichotomy),
-                                                  self.interval)
-                N = len(coeffs)-1
-
-            else:
-                nextpow2 = int(np.log2(N))+1
-                coeffs = self.cheb_poly_fit_function(f, pow(2, nextpow2),
-                                                     self.interval)
-
-            self.ai = coeffs[:N+1]
             if N == 0:
-                self.x = self.interpolation_points(1, self.interval)
+                self.f = np.array([self.ai[0]])
+                self.x = np.array([self.interval[0]])
             else:
-                self.x  = self.interpolation_points(N, self.interval)
+                self.f = np.fft.irfft(self.ai)
+                self.x = self.interpolation_points(N, self.interval)
+
+        else: # f must be a function
+            if not N: # N is not provided
+                # Choose some value
+                N = 16
+
+            self.x  = self.interpolation_points(N, self.interval)
             self.f  = f(self.x)
-            self.p  = Bary(self.x, self.f)
+            self.ai = self.get_coeffs_from_array(self.f)
+
+        self.p  = FInterp(np.concatenate((self.x, [self.interval[1]])), 
+                       np.concatenate((self.f,[self.f[0]])))
 
     @classmethod
     def interpolation_points(self, N, interval):
@@ -129,7 +142,7 @@ class Foufun(Pointfun):
 
     def get_coeffs_from_array(self, f):
         if len(f) == 1:
-            return np.array(f)
+            return np.array(f).astype(complex)
 
         return np.fft.rfft(f)
 
@@ -137,38 +150,122 @@ class Foufun(Pointfun):
         return self.get_coeffs_from_array(f(
                 self.interpolation_points(N, interval)))
 
-    #@classmethod  # Can't use this because of self.record
-    def get_optimal_coefficients(self, f, maxN, interval):
-        N = 2
-        for k in xrange(2, self.max_nb_dichotomy):
-            N = N*2
+    @cast_scalar
+    def __add__(self, other):
+        """
+        Addition
+        """
+        if not np.allclose(self.interval, other.interval) or \
+                len(self) != len(other):
+            raise self.UnmatchingDimensions(self.interval, other.interval, 
+                                            len(self), len(other))
 
-            coeffs = self.get_coeffs_from_function(f, N, interval)
-            abs_max_coeff = np.max(np.abs(coeffs))
-            # Special case: check for the zero function
-            if abs_max_coeff < 2*emach:
-                return np.array([0.])
-            # Check for negligible coefficients
-            # If within bound: get negligible coeffs and break
-            bnd = 128*emach*abs_max_coeff
-            if self.record:
-                self.bnds.append(bnd)
-                self.intermediate.append(coeffs)
+        return Foufun(self.f+other.f, interval=self.interval)
 
-            last = abs(coeffs[-2:])
-            print 'coeffs:', coeffs
-            if np.all(last <= bnd) or N >= maxN:
-                break
+    __radd__ = __add__
 
-        # End of convergence loop: construct polynomial
-        [inds]  = np.where(abs(coeffs) >= bnd)
-        N = min(inds[-1], maxN)
 
-        if self.record:
-            self.bnds.append(bnd)
-            self.intermediate.append(coeffs)
+    @cast_scalar
+    def __sub__(self, other):
+        """
+        Subtraction.
+        """
+        if not np.allclose(self.interval, other.interval) or \
+                len(self) != len(other):
+            raise self.UnmatchingDimensions(self.interval, other.interval, 
+                                            len(self), len(other))
 
-        if N == pow(2, self.max_nb_dichotomy-1):
-            raise self.NoConvergence(last, bnd)
+        return Foufun(self.f-other.f, interval=self.interval)
 
-        return coeffs[:N+1]
+    def __rsub__(self, other):
+        return -(self - other)
+
+
+    @cast_scalar
+    def __mul__(self, other):
+        """
+        Chebfun multiplication.
+        """
+        if not np.allclose(self.interval, other.interval) or \
+                len(self) != len(other):
+            raise self.UnmatchingDimensions(self.interval, other.interval, 
+                                            len(self), len(other))
+
+        return Foufun(self.f*other.f, interval=self.interval)
+
+    __rmul__ = __mul__
+
+    @cast_scalar
+    def __div__(self, other):
+        """
+        Chebfun division
+        """
+        if not np.allclose(self.interval, other.interval) or \
+                len(self) != len(other):
+            raise self.UnmatchingDimensions(self.interval, other.interval, 
+                                            len(self), len(other))
+
+        return Foufun(self.f/other.f, interval=self.interval)
+
+    __truediv__ = __div__
+
+    @cast_scalar
+    def __rdiv__(self, other):
+        if not np.allclose(self.interval, other.interval) or \
+                len(self) != len(other):
+            raise self.UnmatchingDimensions(self.interval, other.interval, 
+                                            len(self), len(other))
+
+        return Foufun(other.f/self.f, interval=self.interval)
+
+    __rtruediv__ = __rdiv__
+
+    def __neg__(self):
+        """
+        Negation.
+        """
+        return self.__class__(-self.f, interval=self.interval)
+
+    def __pow__(self, other):
+        return self.__class__(self.f**other, interval=self.interval)
+
+
+    def sqrt(self):
+        """
+        Square root of Pointfun.
+        """
+        return self.__class__(np.sqrt(self.f), 
+                              interval=self.interval)
+
+
+    def differentiate(self):
+        new_coeffs = self.ai.copy()
+        scale = 2*np.pi/(self.interval[1]-self.interval[0])
+        for k in xrange(len(self.ai)-1):
+            new_coeffs[k] = complex(0,k)*new_coeffs[k]*scale
+        new_coeffs[-1] = 0.
+
+        return Foufun(coeffs=new_coeffs, interval=self.interval)
+
+    def compare(self, f, *args, **kwds):
+        """
+        Plots the give function f against the current Foufun interpolant.
+        Also plots the errors in the points stored compared to f.
+
+        INPUTS:
+
+            -- f: Python, Numpy, or Sage function
+        """
+        fig = plt.figure()
+        ax  = fig.add_subplot(211)
+
+        ax.plot(self.x, f(self.x), 
+                '#dddddd', linewidth=10, label='Actual', *args, **kwds)
+        label = 'Interpolant (d={0})'.format(len(self))
+        self.plot(color='red', label=label, *args, **kwds)
+        ax.legend(loc='best')
+
+        ax  = fig.add_subplot(212)
+        ax.plot(self.x, abs(f(self.x)-self.f), 'k')
+
+        return ax
