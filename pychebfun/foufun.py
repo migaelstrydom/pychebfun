@@ -31,7 +31,7 @@ def cast_scalar(method):
     @wraps(method)
     def new_method(self, other):
         if np.isscalar(other):
-            other = self.__class__([float(other)]*len(self), 
+            other = self.__class__([float(other)]*len(self),
                                    interval=self.interval)
         return method(self, other)
     return new_method
@@ -42,9 +42,9 @@ class Foufun(Pointfun):
     methods to operate on it.
 
     For a Foufun object, the following properties are always defined:
-    numpy.array x: The points on which the Foufun is defined. 
+    numpy.array x: The points on which the Foufun is defined.
     numpy.array f: The values of the Foufun at points x. N points are stored,
-       and f(x[N+1]) == f(x[0]). 
+       and f(x[N+1]) == f(x[0]).
     numpy.array interval: The interval on which the function is periodic,
        f(interval[0]) == f(interval[1]).
     numpy.array ai: The Fourier coefficients of the Foufun.
@@ -55,14 +55,14 @@ class Foufun(Pointfun):
     class UnmatchingDimensions(Exception):
         """
         Raised when performing operations on two Foufuns that are
-        not defined on the same interval or have differing numbers 
+        not defined on the same interval or have differing numbers
         of points.
         """
 
     def __init__(self, f=None, N=0, coeffs=None, interval=[0., 2*np.pi]):
         """
         Create a Fourier series approximation of the function $f$ on
-        the interval :math:`[0, 2*pi]`. 
+        the interval :math:`[0, 2*pi]`.
 
         :param callable f: Python, Numpy, or Sage function
         :param int N: (default = None) specify number of interpolating points
@@ -94,6 +94,9 @@ class Foufun(Pointfun):
             vals = np.array(f)
 
             N = len(vals)
+            if N > 1 and N%2 == 1:
+                print "Warning: Foufun doesn't support arrays of odd \
+length (other than length 1)."
 
             self.ai = self.get_coeffs_from_array(vals)
 
@@ -124,12 +127,14 @@ class Foufun(Pointfun):
             if not N: # N is not provided
                 # Choose some value
                 N = 16
+            elif N%2 == 1:
+                N = N + 1 # We don't support arrays with odd length
 
             self.x  = self.interpolation_points(N, self.interval)
             self.f  = f(self.x)
             self.ai = self.get_coeffs_from_array(self.f)
 
-        self.p  = FInterp(np.concatenate((self.x, [self.interval[1]])), 
+        self.p  = FInterp(np.concatenate((self.x, [self.interval[1]])),
                        np.concatenate((self.f,[self.f[0]])))
 
     @classmethod
@@ -138,7 +143,7 @@ class Foufun(Pointfun):
         Returns N+1 evenly spaced points on the interval.
         """
         return np.linspace(interval[0], interval[1], N+1)[:N]
-        
+
 
     def get_coeffs_from_array(self, f):
         if len(f) == 1:
@@ -157,7 +162,7 @@ class Foufun(Pointfun):
         """
         if not np.allclose(self.interval, other.interval) or \
                 len(self) != len(other):
-            raise self.UnmatchingDimensions(self.interval, other.interval, 
+            raise self.UnmatchingDimensions(self.interval, other.interval,
                                             len(self), len(other))
 
         return Foufun(self.f+other.f, interval=self.interval)
@@ -172,7 +177,7 @@ class Foufun(Pointfun):
         """
         if not np.allclose(self.interval, other.interval) or \
                 len(self) != len(other):
-            raise self.UnmatchingDimensions(self.interval, other.interval, 
+            raise self.UnmatchingDimensions(self.interval, other.interval,
                                             len(self), len(other))
 
         return Foufun(self.f-other.f, interval=self.interval)
@@ -188,7 +193,7 @@ class Foufun(Pointfun):
         """
         if not np.allclose(self.interval, other.interval) or \
                 len(self) != len(other):
-            raise self.UnmatchingDimensions(self.interval, other.interval, 
+            raise self.UnmatchingDimensions(self.interval, other.interval,
                                             len(self), len(other))
 
         return Foufun(self.f*other.f, interval=self.interval)
@@ -202,7 +207,7 @@ class Foufun(Pointfun):
         """
         if not np.allclose(self.interval, other.interval) or \
                 len(self) != len(other):
-            raise self.UnmatchingDimensions(self.interval, other.interval, 
+            raise self.UnmatchingDimensions(self.interval, other.interval,
                                             len(self), len(other))
 
         return Foufun(self.f/other.f, interval=self.interval)
@@ -213,7 +218,7 @@ class Foufun(Pointfun):
     def __rdiv__(self, other):
         if not np.allclose(self.interval, other.interval) or \
                 len(self) != len(other):
-            raise self.UnmatchingDimensions(self.interval, other.interval, 
+            raise self.UnmatchingDimensions(self.interval, other.interval,
                                             len(self), len(other))
 
         return Foufun(other.f/self.f, interval=self.interval)
@@ -234,7 +239,7 @@ class Foufun(Pointfun):
         """
         Square root of Pointfun.
         """
-        return self.__class__(np.sqrt(self.f), 
+        return self.__class__(np.sqrt(self.f),
                               interval=self.interval)
 
 
@@ -243,7 +248,7 @@ class Foufun(Pointfun):
         scale = 2*np.pi/(self.interval[1]-self.interval[0])
         for k in xrange(len(self.ai)-1):
             new_coeffs[k] = complex(0,k)*new_coeffs[k]*scale
-        new_coeffs[-1] = 0.
+        #new_coeffs[-1] = 0.
 
         return Foufun(coeffs=new_coeffs, interval=self.interval)
 
@@ -259,7 +264,7 @@ class Foufun(Pointfun):
         fig = plt.figure()
         ax  = fig.add_subplot(211)
 
-        ax.plot(self.x, f(self.x), 
+        ax.plot(self.x, f(self.x),
                 '#dddddd', linewidth=10, label='Actual', *args, **kwds)
         label = 'Interpolant (d={0})'.format(len(self))
         self.plot(color='red', label=label, *args, **kwds)

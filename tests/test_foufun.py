@@ -43,7 +43,7 @@ class Test_Foufun_Init(unittest.TestCase):
         self.assertEqual(len(ff.x), 2)
         self.assertEqual(len(ff.f), 2)
         npt.assert_almost_equal(ff.f, 2./np.pi*ff.x)
-        
+
     def test_coeffs_init(self):
         ff = Foufun(coeffs=[1.15])
         npt.assert_almost_equal(ff(xs), const_func(1.15, xs))
@@ -71,33 +71,41 @@ class Test_Foufun_Differentiate(unittest.TestCase):
         npt.assert_allclose(dffexact(dff.x), dff.f, atol=1e-12)
 
     def test_differentiate3(self):
-        ff = Foufun(lambda x: np.exp(3*np.sin(2*x)), 768, 
+        ff = Foufun(lambda x: np.exp(3*np.sin(2*x)), 768,
                     interval=[-np.pi, 7*np.pi])
         dff = ff.differentiate()
         dffexact = lambda x: 6*np.cos(2*x)*np.exp(3*np.sin(2*x))
-        npt.assert_allclose(dffexact(dff.x), dff.f, atol=1e-12)       
+        npt.assert_allclose(dffexact(dff.x), dff.f, atol=1e-12)
 
     def test_differentiate4(self):
         Bc = 5.15
-        ff = Foufun(lambda x: np.exp(-0.5*Bc*x*x), 150, 
+        ff = Foufun(lambda x: np.exp(-0.5*Bc*x*x), 150,
                     interval=[-15., 5.])
         dff = ff.differentiate()
         dffexact = lambda x: -Bc*x*np.exp(-0.5*Bc*x*x)
-        npt.assert_allclose(dffexact(dff.x), dff.f, atol=1e-12)    
+        npt.assert_allclose(dffexact(dff.x), dff.f, atol=1e-12)
+
+    def test_differentiate5(self):
+        Bc = 5.15
+        ff = Foufun(lambda x: np.exp(-0.5*Bc*x*x), 151,
+                    interval=[-15., 5.])
+        dff = ff.differentiate()
+        dffexact = lambda x: -Bc*x*np.exp(-0.5*Bc*x*x)
+        npt.assert_allclose(dffexact(dff.x), dff.f, atol=1e-12)
 
 class Test_Foufun_Arithmetic(unittest.TestCase):
 
     def test_add_scalar(self):
         Bc = 37.
-        ff = Foufun(lambda x: np.exp(-0.5*Bc*x*x), 100, 
+        ff = Foufun(lambda x: np.exp(-0.5*Bc*x*x), 100,
                     interval=[-15., 5.])
-        res = ff + 3.141 
+        res = ff + 3.141
         resexact = lambda x: np.exp(-0.5*Bc*x*x)+3.141
         npt.assert_allclose(resexact(ff.x), res.f)
 
     def test_add(self):
         Bc = 10.
-        ff = Foufun(lambda x: np.exp(-0.5*Bc*x*x), 100, 
+        ff = Foufun(lambda x: np.exp(-0.5*Bc*x*x), 100,
                     interval=[-15., 5.])
         res = ff + Foufun(np.sin, 100, interval=[-15., 5.])
         resexact = lambda x: np.exp(-0.5*Bc*x*x)+np.sin(x)
